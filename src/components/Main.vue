@@ -70,6 +70,7 @@ export default {
           coords: [59.926971, 30.338033]
         }],
       myMap: null,
+      myClusterer: null,
       newOrderIsOpened: false
     }
   },
@@ -87,6 +88,7 @@ export default {
           center: center,
           zoom: zoom
         });
+        self.myClusterer = new ymaps.Clusterer();
       }
     },
     addPlacemark: function(order) {
@@ -98,7 +100,8 @@ export default {
           hintContent: order.userName,
           balloonContent: order.description
         })
-        self.myMap.geoObjects.add(pm);
+        self.myClusterer.add(pm);
+        self.myMap.geoObjects.add(self.myClusterer);
       }
     },
     addAll: function () {
