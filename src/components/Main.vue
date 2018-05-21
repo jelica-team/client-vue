@@ -37,7 +37,7 @@
         v-if="newOrderIsOpened"
         :map="myMap"
         @cancel="newOrderIsOpened = false"
-        @madeOrder="saveOrder"
+        @madeOrder="addPlacemark"
       />
     </div>
   </div>
@@ -54,7 +54,7 @@ export default {
   },
   data () {
     return {
-      user: 'Some Guy',
+      user: 'Me',
       orders: [{
         userName: 'Roman Mazeev',
         time: 1526481455008,
@@ -71,6 +71,7 @@ export default {
         }],
       myMap: null,
       myClusterer: null,
+      myCollection: null,
       newOrderIsOpened: false
     }
   },
@@ -89,24 +90,63 @@ export default {
           zoom: zoom
         });
         self.myClusterer = new ymaps.Clusterer();
+        self.myCollection = new ymaps.GeoObjectCollection();
+        // self.myClusterer.events.add('click', function (e) {
+        //   if (!e.get('target').getGeoObjects) {
+        //     e.preventDefault();
+        //     self.myClusterer.remove(e.get('target'));
+        //   }
+        // });
       }
     },
-    addPlacemark: function(order) {
-      let self = this
+    balloon: function (order, confirmed) {
+      let self = this;
+      let BalloonContentLayout = ymaps.templateLayoutFactory.createClass(
+        '<h3>' + (confirmed ? order.userName : self.user) + '</h3>' +
+        '<p>'+ order.description +'</p>' +
+        '<button id="submit-balloon">' + (confirmed ? 'Get the order' : 'Confirm an order') + '</button>' +
+        '<button id="cancel">' + 'Cancel' + '</button>', {
+          build: function () {
+            BalloonContentLayout.superclass.build.call(this);
+            $('#submit-balloon').bind('click', this.onSubmitClick);
+            $('#cancel').bind('click', this.onCancelClick);
+          },
+          clear: function () {
+            $('#submit-balloon').unbind('click', this.onSubmitClick);
+            $('#cancel').unbind('click', this.onCancelClick);
+            BalloonContentLayout.superclass.clear.call(this);
+          },
+          onSubmitClick: function () {
+            return confirmed ? self.addToMyProgress(order) : self.saveOrder(order);
+          },
+          onCancelClick: function () {
+            return self.myMap.balloon.close();
+          }
+        });
+      return BalloonContentLayout;
+    },
+    addPlacemark: function(order, confirmed) {
+      let self = this;
       ymaps.ready(add);
 
       function add() {
-        let pm = new ymaps.Placemark(order.coords, {
-          hintContent: order.userName,
-          balloonContent: order.description
-        })
-        self.myClusterer.add(pm);
-        self.myMap.geoObjects.add(self.myClusterer);
+        let balloon = self.balloon(order, confirmed);
+        let pm = new ymaps.Placemark(order.coords, { }, {
+          draggable: !confirmed,
+          balloonContentLayout: balloon
+        });
+        if (confirmed) {
+          self.myClusterer.add(pm);
+          self.myMap.geoObjects.add(self.myClusterer);
+        } else {
+          self.myCollection.add(pm);
+          self.myMap.geoObjects.add(self.myCollection);
+        }
       }
     },
     addAll: function () {
       for (let i = 0; i < this.orders.length; ++i) {
-        this.addPlacemark(this.orders[i])
+        this.addPlacemark(this.orders[i], true);
       }
     },
     goToPlace: function (coords) {
@@ -128,15 +168,20 @@ export default {
         ((days >= 2) ? ' days' : ' day') + ' ago';
     },
     saveOrder: function (order) {
-      this.orders.push({
+      let myOrder = {
         userName: this.user,
         time: Date.now(),
         description: order.description,
         address: order.address,
         coords: order.coords
-      });
-      this.addPlacemark(order)
-      this.goToPlace(order.coords)
+      };
+      this.myCollection.removeAll();
+      this.addPlacemark(myOrder, true);
+      this.orders.push(myOrder);
+    },
+    addToMyProgress: function (order) {
+      this.myMap.balloon.close();
+      alert('The order got!')
     }
   }
 }
@@ -163,7 +208,7 @@ export default {
 #mask {
   background-color:rgba(0, 0, 0, 0.3);
   height:100%;
-  position:fixed;
+  position: fixed;
   width:100%;
   top:0;
   left:0;
@@ -171,6 +216,7 @@ export default {
 }
 #map {
   float: right;
+  /*position: fixed;*/
   width: 72vw;
   height: 100vh;
   margin: 0;

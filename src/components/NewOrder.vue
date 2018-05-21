@@ -46,7 +46,8 @@ import axios from 'axios'
           description: this.description,
           coords: this.coords
         };
-        this.$emit('madeOrder', order)
+        this.$emit('madeOrder', order, false);
+        this.map.setCenter(order.coords, 17);
       },
       showAddress: async function (value) {
         let self = this
