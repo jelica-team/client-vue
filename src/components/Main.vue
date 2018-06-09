@@ -5,17 +5,17 @@
         <div class="header">
           <button class="order-button" @click="newOrderIsOpened = !newOrderIsOpened">Make new order</button>
           <div class="icon">
-            <img src="../assets/profile.png" alt="icon">
+            <img src="../assets/profile.png" alt="icon" @click="profileIsOpened = !profileIsOpened">
           </div>
         </div>
         <div class="orders">
-          <div v-for="order in orders" @click="goToPlace(order.coords)" class="order">
+          <div v-for="order in orders" @click="goToPlace([order.latitude, order.longitude])" class="order">
             <div class="head">
               <div class="user">
                 <img src="../assets/profile.png" alt="icon">
               </div>
-              <span class="user-name">{{ order.userName }}</span>
-              <p class="time">{{ setTime(order.time) }}</p>
+              <span class="user-name">{{ order.username }}</span>
+              <p class="time">{{ setTime(order.created_at) }}</p>
             </div>
             <p class="description">{{ order.description }}</p>
             <div class="location">
@@ -39,45 +39,44 @@
         @cancel="newOrderIsOpened = false"
         @madeOrder="addPlacemark"
       />
+      <Profile
+        v-if="profileIsOpened"
+        :user_id="user"
+      />
     </div>
   </div>
 </template>
 
 <script>
 import NewOrder from './NewOrder'
+import Profile from './Profile'
+import { createOrder,
+  getOrders,
+  getUser
+} from "../helpers";
 
 export default {
   name: 'MainPage',
  // props: ['user'],
   components: {
-    NewOrder
+    NewOrder,
+    Profile
   },
   data () {
     return {
-      user: 'Me',
-      orders: [{
-        userName: 'Roman Mazeev',
-        time: 1526481455008,
-        description: 'Please, bring me one cup of coffee, I will give you 100 roubles and you can keep a change to you',
-        address: 'Вяземский пер., 5-7',
-        coords: [59.972981584288235, 30.302002656366767]
-      },
-        {
-          userName: 'Sergey Novikov',
-          time: 1526667201995,
-          description: 'I hate russians! Please, buy for me one ticket to Spain..',
-          address: 'ул. Ломоносова, 9',
-          coords: [59.926971, 30.338033]
-        }],
+      user: localStorage.getItem('user_id'),
+      orders: [],
       myMap: null,
       myClusterer: null,
       myCollection: null,
-      newOrderIsOpened: false
+      newOrderIsOpened: false,
+      profileIsOpened: false
     }
   },
-  mounted: function () {
+  mounted: async function () {
     this.initMap(13, [59.9342092, 30.324571]);
     this.addAll();
+    this.res = await this.getUserNameById(5);
   },
   methods: {
     initMap: function (zoom, center) {
@@ -91,18 +90,12 @@ export default {
         });
         self.myClusterer = new ymaps.Clusterer();
         self.myCollection = new ymaps.GeoObjectCollection();
-        // self.myClusterer.events.add('click', function (e) {
-        //   if (!e.get('target').getGeoObjects) {
-        //     e.preventDefault();
-        //     self.myClusterer.remove(e.get('target'));
-        //   }
-        // });
       }
     },
     balloon: function (order, confirmed) {
       let self = this;
       let BalloonContentLayout = ymaps.templateLayoutFactory.createClass(
-        '<h3>' + (confirmed ? order.userName : self.user) + '</h3>' +
+        '<h3>' + (confirmed ? order.username : 'Me') + '</h3>' +
         '<p>'+ order.description +'</p>' +
         '<button id="submit-balloon">' + (confirmed ? 'Get the order' : 'Confirm an order') + '</button>' +
         '<button id="cancel">' + 'Cancel' + '</button>', {
@@ -131,7 +124,7 @@ export default {
 
       function add() {
         let balloon = self.balloon(order, confirmed);
-        let pm = new ymaps.Placemark(order.coords, { }, {
+        let pm = new ymaps.Placemark([order.latitude, order.longitude], { }, {
           draggable: !confirmed,
           balloonContentLayout: balloon
         });
@@ -144,9 +137,11 @@ export default {
         }
       }
     },
-    addAll: function () {
+    addAll: async function () {
+      let response = await getOrders();
+      this.orders = response.data;
       for (let i = 0; i < this.orders.length; ++i) {
-        this.addPlacemark(this.orders[i], true);
+        await this.addPlacemark(this.orders[i], true)
       }
     },
     goToPlace: function (coords) {
@@ -160,28 +155,27 @@ export default {
       let days = hours / 24;
       if (seconds < 1) return 'just now';
       if (minutes < 1) return Math.floor(seconds) +
-        ((seconds >= 2) ? ' seconds' : 'second') + ' ago';
+        ((seconds >= 2) ? ' seconds' : ' second') + ' ago';
       if (hours < 1) return Math.floor(minutes) +
-        ((minutes >= 2) ? ' minutes' : 'minute') + ' ago';
+        ((minutes >= 2) ? ' minutes' : ' minute') + ' ago';
       return (days < 1) ? Math.floor(hours) +
         ((hours >= 2) ? ' hours' : ' hour') + ' ago' : Math.floor(days) +
         ((days >= 2) ? ' days' : ' day') + ' ago';
     },
-    saveOrder: function (order) {
-      let myOrder = {
-        userName: this.user,
-        time: Date.now(),
-        description: order.description,
-        address: order.address,
-        coords: order.coords
-      };
+    saveOrder: async function (order) {
+      order['user_id'] = this.user;
+      this.myMap.balloon.close();
+      const response = await createOrder(order);
       this.myCollection.removeAll();
-      this.addPlacemark(myOrder, true);
-      this.orders.push(myOrder);
+      this.addPlacemark(order, true);
     },
     addToMyProgress: function (order) {
       this.myMap.balloon.close();
-      alert('The order got!')
+    },
+    getUserNameById: function (id) {
+      return getUser(id).then(response => {
+        return response.data[0].username
+      })
     }
   }
 }
@@ -206,7 +200,7 @@ export default {
   margin: 15px;
 }
 #mask {
-  background-color:rgba(0, 0, 0, 0.3);
+  background-color:rgba(0, 0, 0, 0.7);
   height:100%;
   position: fixed;
   width:100%;
@@ -262,7 +256,7 @@ img {
   margin-top: 15px;
   width: 100%;
   height: calc(100% - 60px);
-  display: -webkit-inline-box;
+  display: inline-block;
   overflow: auto;
 }
 .order {

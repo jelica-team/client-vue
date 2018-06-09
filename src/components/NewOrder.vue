@@ -6,7 +6,7 @@
       <input placeholder="Address.." v-model="address">
       <div class="buttons">
         <button class="cancel btn" @click="$emit('cancel')">Cancel</button>
-        <button class="submit btn" @click="showAddress(address)">Make an order</button>
+        <button class="submit btn" @click="showAddress">Make an order</button>
       </div>
     </div>
     <div v-if="isFailed" class="inner">
@@ -44,13 +44,14 @@ import axios from 'axios'
         let order = {
           address: this.address,
           description: this.description,
-          coords: this.coords
+          latitude: this.coords[0],
+          longitude: this.coords[1]
         };
         this.$emit('madeOrder', order, false);
-        this.map.setCenter(order.coords, 17);
+        this.map.setCenter([order.latitude, order.longitude], 17);
       },
-      showAddress: async function (value) {
-        let self = this
+      showAddress: async function () {
+        let self = this;
         await axios.get('https://geocode-maps.yandex.ru/1.x/?format=json&geocode='
           + this.address +'&results=1')
           .then((response) => {
