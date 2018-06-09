@@ -1,54 +1,40 @@
 <template>
   <form class="container" @submit="onSubmit">
     <div class="field">
-      <p>Name</p>
-      <input type="text" placeholder="Enter your name.." v-model="form.username">
-    </div>
-    <div class="field">
       <p>E-mail</p>
-      <input type="email" placeholder="Enter your email.." v-model="form.email">
-    </div>
-    <div class="field">
-      <p>Phone</p>
-      <input type="tel" placeholder="Enter your phone number.." v-model="form.phone">
+      <input type="text" placeholder="Enter your email.." v-model="form.username">
     </div>
     <div class="field">
       <p>Password</p>
       <input type="password" placeholder="Enter your password.." v-model="form.password">
     </div>
-    <div class="field">
-      <p>Confirm password</p>
-      <input type="password" placeholder="Confirm password.." v-model="form.confirm_password">
-    </div>
-    <button type="submit">Sign up</button>
-    <p class="link">Have account? <router-link to="login">Log in</router-link></p>
+    <button type="submit">Login</button>
+    <p class="link">Have not account? <router-link to="signup">Sign up</router-link></p>
   </form>
 </template>
 
 <script>
-  import { seedUser } from "../helpers"
+  import { authenticate } from "../helpers/index"
 
   export default {
+    name: 'Login',
     data () {
       return {
         form: {
-          email: '',
           username: '',
-          password: '',
-          confirm_password:'',
-          phone: ''
+          password: ''
         }
       }
     },
     methods: {
       onSubmit (e) {
         e.preventDefault();
-        seedUser(this.form)
+        authenticate(this.form)
           .then(response => {
-            // JSON responses automatically parsed.
-            this.form = response.data;
-            if (this.form.status === 200)
-              this.$refs.modal.show()
+            // JSON responses are automatically parsed.
+            localStorage.setItem('token', response.data.token);
+            localStorage.setItem('user_id', response.data.user.id);
+            this.$router.push('/main')
           })
           .catch(e => {
             console.log(e)
@@ -61,7 +47,7 @@
 <style scoped>
   .container{
     width: 360px;
-    margin: 100px auto;
+    margin: 250px auto;
     color: #2699FB;
   }
   .field {

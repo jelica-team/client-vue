@@ -1,7 +1,8 @@
 import axios from 'axios';
+import URL from './address';
 
 export default() => {
   return axios.create({
-    baseURL: `http://localhost:3000`
+    baseURL: URL
   })
 }

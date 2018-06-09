@@ -1,13 +1,21 @@
-export const getJwt = () => {
-  return 'bearer ' + localStorage.getItem('example-jwt-jwt');
+import Api from './Api';
+
+export const createOrder = (order) => {
+  return Api().post('/createOrder', order);
 };
 
-import Api from '@/helpers/Api';
-
-export const register = (email, password) => {
-  return Api().post('/seedUser', { email, password })
+export const getOrders = () => {
+  return Api().get('/getOrders');
 };
 
-export const login = (email, password) => {
-  return Api().post('/auth/getToken', { email, password })
+export const authenticate = (form) => {
+  return Api().post('/public/login', form);
 };
+
+export const seedUser = (form) => {
+  return Api().post('/public/register/', form);
+};
+
+export async function getUser (id) {
+  return await Api().get('/user/' + id);
+}
