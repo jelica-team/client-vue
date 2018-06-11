@@ -5,33 +5,41 @@
         <div class="header">
           <button class="order-button" @click="newOrderIsOpened = !newOrderIsOpened">Make new order</button>
           <div class="icon">
-            <img src="../assets/profile.png" alt="icon" @click="profileIsOpened = !profileIsOpened">
+            <img src="../assets/profile.png" alt="icon" @click="openProfile(user)">
           </div>
         </div>
         <div class="orders">
-          <div v-for="order in orders" @click="goToPlace([order.latitude, order.longitude])" class="order">
+          <div v-for="order in orders" class="order">
             <div class="head">
-              <div class="user">
+              <div class="user" @click="openProfile(order.user_id)">
                 <img src="../assets/profile.png" alt="icon">
               </div>
               <span class="user-name">{{ order.username }}</span>
               <p class="time">{{ setTime(order.created_at) }}</p>
             </div>
             <p class="description">{{ order.description }}</p>
-            <div class="location">
+            <div class="location" @click="goToPlace([order.latitude, order.longitude])">
               <div style="width: 10px">
                 <img src="../assets/location.png" alt="location: ">
               </div>
               <p>{{ order.address }}</p>
             </div>
+            <!--{{ order }}-->
+            <button v-if="!allOrders" class="order-button btn" @click="finishOrder(order.short_link)">
+              Finish the order
+            </button>
           </div>
         </div>
+        <button class="order-button" @click="showOtherOption">
+          {{ (allOrders) ? 'Orders which I took' : 'All orders' }}
+        </button>
       </div>
     </div>
-    <div id="mask"
+    <div class="mask"
          v-if="newOrderIsOpened"
          @click="newOrderIsOpened = false"
          ></div>
+    <div class="mask" v-if="unrated"></div>
     <div id="map">
       <NewOrder
         v-if="newOrderIsOpened"
@@ -41,7 +49,14 @@
       />
       <Profile
         v-if="profileIsOpened"
-        :user_id="user"
+        :user_id="openedProfile"
+        @close="profileIsOpened = false"
+      />
+      <RateWindow
+        v-if="unrated"
+        :client="client"
+        :details="res.description"
+        @marked="rate"
       />
     </div>
   </div>
@@ -50,9 +65,15 @@
 <script>
 import NewOrder from './NewOrder'
 import Profile from './Profile'
+import RateWindow from './RateWindow'
 import { createOrder,
   getOrders,
-  getUser
+  getOrdersForUser,
+  closeOrder,
+  takeOrder,
+  getUnratedOrder,
+  rateUser,
+  deleteOrder
 } from "../helpers";
 
 export default {
@@ -60,23 +81,30 @@ export default {
  // props: ['user'],
   components: {
     NewOrder,
-    Profile
+    Profile,
+    RateWindow
   },
   data () {
     return {
       user: localStorage.getItem('user_id'),
+      client: 'someone',
+      allOrders: true,
+      mustDelete: '',
+      res: '',
+      openedProfile: null,
       orders: [],
       myMap: null,
       myClusterer: null,
       myCollection: null,
       newOrderIsOpened: false,
-      profileIsOpened: false
+      profileIsOpened: false,
+      unrated: false
     }
   },
-  mounted: async function () {
+  mounted: function () {
+    this.res = this.getDetails();
     this.initMap(13, [59.9342092, 30.324571]);
     this.addAll();
-    this.res = await this.getUserNameById(5);
   },
   methods: {
     initMap: function (zoom, center) {
@@ -110,7 +138,8 @@ export default {
             BalloonContentLayout.superclass.clear.call(this);
           },
           onSubmitClick: function () {
-            return confirmed ? self.addToMyProgress(order) : self.saveOrder(order);
+            return confirmed ? self.addToMyProgress(order.short_link, order.user_id) :
+              self.saveOrder(order);
           },
           onCancelClick: function () {
             return self.myMap.balloon.close();
@@ -138,7 +167,12 @@ export default {
       }
     },
     addAll: async function () {
-      let response = await getOrders();
+      let response;
+      if (this.allOrders) {
+        response = await getOrders();
+      } else {
+        response = await getOrdersForUser(this.user);
+      }
       this.orders = response.data;
       for (let i = 0; i < this.orders.length; ++i) {
         await this.addPlacemark(this.orders[i], true)
@@ -169,12 +203,48 @@ export default {
       this.myCollection.removeAll();
       this.addPlacemark(order, true);
     },
-    addToMyProgress: function (order) {
+    addToMyProgress: async function (link, client) {
       this.myMap.balloon.close();
+      await takeOrder({
+        short_link: link,
+        user_id: client,
+        client_id: this.user
+      });
     },
-    getUserNameById: function (id) {
-      return getUser(id).then(response => {
-        return response.data[0].username
+    openProfile: function (id) {
+      this.openedProfile = id;
+      this.profileIsOpened = true;
+    },
+    showOtherOption: function () {
+      this.allOrders = !this.allOrders;
+      this.orders = [];
+      this.myClusterer.removeAll();
+      this.addAll();
+    },
+    finishOrder: function (link) {
+      closeOrder({
+        user_id: this.user,
+        short_link: link
+      })
+    },
+    getDetails: async function () {
+      this.res = await getUnratedOrder(this.user);
+      if (this.res.data) {
+        this.unrated = true;
+        this.client = this.res.data.client_id;
+        alert(this.client);
+        this.mustDelete = this.res.data.short_link;
+      }
+    },
+    rate: function (val) {
+      let self = this;
+      rateUser({
+        user_id: this.client,
+        value: val
+      }).then(response => {
+        deleteOrder(self.user, self.mustDelete).then(response => {
+          self.unrated = false;
+        })
       })
     }
   }
@@ -199,7 +269,7 @@ export default {
   height: calc(100% - 30px);
   margin: 15px;
 }
-#mask {
+.mask {
   background-color:rgba(0, 0, 0, 0.7);
   height:100%;
   position: fixed;
@@ -210,7 +280,6 @@ export default {
 }
 #map {
   float: right;
-  /*position: fixed;*/
   width: 72vw;
   height: 100vh;
   margin: 0;
@@ -234,6 +303,11 @@ export default {
   outline: none;
   cursor: pointer;
 }
+.btn {
+  padding: 7px 11px;
+  margin: 8px 0;
+  float: right;
+}
 .icon {
   float: right;
   width: 43px;
@@ -255,7 +329,7 @@ img {
 .orders {
   margin-top: 15px;
   width: 100%;
-  height: calc(100% - 60px);
+  height: calc(100% - 108px);
   display: inline-block;
   overflow: auto;
 }

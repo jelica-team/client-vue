@@ -17,6 +17,8 @@
           <img src="../assets/bad-star.png" alt=".">
         </div>
       </div>
+      <button class="order-button btn" @click="close">Close</button>
+      {{ res }}
     </div>
   </div>
 </template>
@@ -36,18 +38,23 @@
       }
     },
     mounted: function () {
-      let self = this;
-      //let user_id = localStorage.getItem('user_id');
-      getUser(this.user_id).then(response => {
-        self.res = response;
-        self.name = response.data[0].username;
-        self.phone = response.data[0].phone;
-        self.score = response.data[0].rating;
-      });
+      this.fetchStats()
     },
     computed: {
       restStars: function () {
         return 5 - this.score
+      }
+    },
+    methods: {
+      close: function () {
+        this.$emit('close');
+      },
+      fetchStats: function () {
+        getUser(this.user_id).then(response => {
+          this.name = response.data[0].username;
+          this.phone = response.data[0].phone;
+          this.score = response.data[0].rating;
+        });
       }
     }
   }
@@ -89,6 +96,23 @@
   width: 30px;
   height: 30px;
   margin: 1px;
+}
+.order-button {
+  padding: 14px 22px;
+  float: left;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  background-color: #2699FB;
+  border: none;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+.btn {
+  padding: 7px 11px;
+  margin: 8px 0;
+  float: right;
 }
 img {
   height: 100%;

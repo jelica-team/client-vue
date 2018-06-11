@@ -4,8 +4,8 @@ export const createOrder = (order) => {
   return Api().post('/createOrder', order);
 };
 
-export const getOrders = () => {
-  return Api().get('/getOrders');
+export async function getOrders () {
+  return await Api().get('/getOrders');
 };
 
 export const authenticate = (form) => {
@@ -16,6 +16,30 @@ export const seedUser = (form) => {
   return Api().post('/public/register/', form);
 };
 
-export async function getUser (id) {
-  return await Api().get('/user/' + id);
+export const getUser = (id) => {
+  return Api().get('/user/' + id);
+}
+
+export async function takeOrder (params) {
+  return await Api().post('/takeOrder', params);
+}
+
+export async function getOrdersForUser (id) {
+  return await Api().get('/getOrdersForUser/' + id);
+}
+
+export const closeOrder = (params) => {
+  return Api().post('/close', params);
+};
+
+export async function getUnratedOrder (id) {
+  return Api().get('/ordersForRate/' + id);
+}
+
+export const rateUser = (params) => {
+  return Api().post('/rateUser', params);
+};
+
+export const deleteOrder = (id, link) => {
+  return Api().get('/delete/' + id + '/' + link);
 }
